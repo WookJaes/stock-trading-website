@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, BarChart3, BriefcaseBusiness, Building2, ChevronRight, CircleDollarSign, Clock3, Globe2, LayoutDashboard, LoaderCircle, LockKeyhole, Menu, RefreshCw, Search, ShieldCheck, WalletCards, X } from 'lucide-react';
 import { QueryProvider } from '@/components/query-provider';
+import { StockTradePanel, type TradeStock } from '@/components/stock-trade-panel';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 type Environment = 'domestic-mock' | 'overseas-mock';
@@ -58,11 +59,12 @@ function Dashboard() {
   const [feature, setFeature] = useState<'account' | 'search'>('account');
   const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedStock, setSelectedStock] = useState<TradeStock | null>(null);
   const query = useQuery({ queryKey: ['account', environment], queryFn: () => getAccount(environment), staleTime: 30_000, retry: 1, enabled: feature === 'account' });
   const stockQuery = useQuery({ queryKey: ['stocks', environment, searchTerm], queryFn: () => searchStocks(environment, searchTerm), enabled: feature === 'search' && searchTerm.length > 0, staleTime: 10 * 60_000, retry: 1 });
   const data = query.data;
   const currency = data?.currency ?? (environment === 'domestic-mock' ? 'KRW' : 'USD');
-  const changeEnvironment = (next: Environment) => { setEnvironment(next); setSearchInput(''); setSearchTerm(''); };
+  const changeEnvironment = (next: Environment) => { setEnvironment(next); setSearchInput(''); setSearchTerm(''); setSelectedStock(null); };
 
   return <main className="min-h-screen bg-slate-50 text-slate-950">
     <header className="sticky top-0 z-30 border-b border-slate-200/90 bg-white/95 backdrop-blur">
@@ -113,11 +115,12 @@ function Dashboard() {
 
           <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white">
             <div className="border-b border-slate-200 px-5 py-4"><h2 className="font-bold">검색 결과</h2><p className="mt-1 text-xs text-slate-500">{searchTerm ? stockQuery.data ? `총 ${number(stockQuery.data.total)}개 중 최대 50개 표시` : '검색 중' : '검색어를 입력해 주세요.'}</p></div>
-            {stockQuery.isFetching ? <div className="grid min-h-56 place-items-center"><div className="text-center"><LoaderCircle className="mx-auto size-6 animate-spin text-emerald-800"/><p className="mt-3 text-sm text-slate-500">종목 목록을 검색하고 있습니다.</p></div></div> : stockQuery.isError ? <div className="m-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><div className="flex gap-2"><AlertCircle className="size-4 shrink-0"/><p>{stockQuery.error.message}</p></div></div> : !searchTerm ? <div className="grid min-h-56 place-items-center text-center"><div><Search className="mx-auto size-8 text-slate-300"/><p className="mt-3 text-sm text-slate-500">검색 결과가 여기에 표시됩니다.</p></div></div> : stockQuery.data?.results.length === 0 ? <div className="grid min-h-56 place-items-center text-center"><div><Search className="mx-auto size-8 text-slate-300"/><p className="mt-3 font-semibold text-slate-700">검색 결과가 없습니다</p><p className="mt-1 text-sm text-slate-400">종목명이나 종목코드를 다시 확인해 주세요.</p></div></div> : <Table><TableHeader className="bg-slate-50/80"><TableRow><TableHead className="pl-5">종목명</TableHead><TableHead>종목코드</TableHead><TableHead>시장</TableHead><TableHead className="pr-5">업종·상태</TableHead></TableRow></TableHeader><TableBody>{stockQuery.data?.results.map((stock) => <TableRow key={`${stock.market}-${stock.code}`}><TableCell className="py-4 pl-5"><div className="font-semibold text-slate-800">{stock.name || stock.englishName}</div>{stock.englishName && <div className="mt-1 text-xs text-slate-400">{stock.englishName}</div>}</TableCell><TableCell className="font-mono text-sm font-semibold text-slate-700">{stock.code}</TableCell><TableCell><span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">{stock.market}</span></TableCell><TableCell className="pr-5 text-sm text-slate-500">{stock.sector || stock.status || (stock.isEtf ? 'ETF' : '-')}</TableCell></TableRow>)}</TableBody></Table>}
+            {stockQuery.isFetching ? <div className="grid min-h-56 place-items-center"><div className="text-center"><LoaderCircle className="mx-auto size-6 animate-spin text-emerald-800"/><p className="mt-3 text-sm text-slate-500">종목 목록을 검색하고 있습니다.</p></div></div> : stockQuery.isError ? <div className="m-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><div className="flex gap-2"><AlertCircle className="size-4 shrink-0"/><p>{stockQuery.error.message}</p></div></div> : !searchTerm ? <div className="grid min-h-56 place-items-center text-center"><div><Search className="mx-auto size-8 text-slate-300"/><p className="mt-3 text-sm text-slate-500">검색 결과가 여기에 표시됩니다.</p></div></div> : stockQuery.data?.results.length === 0 ? <div className="grid min-h-56 place-items-center text-center"><div><Search className="mx-auto size-8 text-slate-300"/><p className="mt-3 font-semibold text-slate-700">검색 결과가 없습니다</p><p className="mt-1 text-sm text-slate-400">종목명이나 종목코드를 다시 확인해 주세요.</p></div></div> : <Table><TableHeader className="bg-slate-50/80"><TableRow><TableHead className="pl-5">종목명</TableHead><TableHead>종목코드</TableHead><TableHead>시장</TableHead><TableHead className="pr-5">업종·상태</TableHead></TableRow></TableHeader><TableBody>{stockQuery.data?.results.map((stock) => <TableRow key={`${stock.market}-${stock.code}`}><TableCell className="py-2 pl-3"><button type="button" onClick={() => setSelectedStock(stock)} className="w-full rounded-lg px-2 py-2 text-left hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-emerald-700"><div className="font-semibold text-slate-800">{stock.name || stock.englishName}</div>{stock.englishName && <div className="mt-1 text-xs text-slate-400">{stock.englishName}</div>}</button></TableCell><TableCell className="font-mono text-sm font-semibold text-slate-700">{stock.code}</TableCell><TableCell><span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">{stock.market}</span></TableCell><TableCell className="pr-5 text-sm text-slate-500">{stock.sector || stock.status || (stock.isEtf ? 'ETF' : '-')}</TableCell></TableRow>)}</TableBody></Table>}
           </div>
         </section>}
       </div></section>
     </div>
+    {selectedStock && <StockTradePanel stock={selectedStock} environment={environment} onClose={() => setSelectedStock(null)}/>}
   </main>;
 }
 
