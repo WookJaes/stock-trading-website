@@ -8,6 +8,7 @@ import { StockTradePanel, type TradeStock } from '@/components/stock-trade-panel
 import { RankingsView } from '@/components/rankings-view';
 import { LogoutButton } from '@/components/logout-button';
 import { HoldingsTable } from '@/components/holdings-table';
+import { AccountCsvDownload } from '@/components/account-csv-download';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { WatchlistButton, WatchlistProvider, WatchlistView } from '@/components/watchlist';
 
@@ -104,8 +105,8 @@ function Dashboard() {
             { label: '총 평가손익', value: data.totalProfitLoss, change: true, sub: '평가금액 − 매입금액' },
             { label: '총 수익률', value: data.totalProfitRate, rate: true, change: true, sub: '보유자산 평가수익률' },
           ].map((card) => <article key={card.label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.03)]"><p className="text-xs font-semibold text-slate-500">{card.label}</p><div className="mt-4 text-xl font-bold tracking-tight tabular-nums md:text-2xl">{card.change ? <Change value={card.value} suffix={card.rate ? '%' : ''}/> : money(card.value, currency)}</div><p className="mt-2 text-[11px] text-slate-400">{card.sub}</p></article>)}</div>
-          <section className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.03)]"><div className="flex items-center justify-between border-b border-slate-200 px-5 py-4"><div><h2 className="font-bold">보유 종목</h2><p className="mt-1 text-xs text-slate-500">총 {data.holdings.length}개 종목</p></div><div className="flex items-center gap-1.5 text-[11px] text-slate-400"><Clock3 className="size-3.5"/>{new Date(data.asOf).toLocaleString('ko-KR')}</div></div>
-            {data.holdings.length === 0 ? <div className="grid min-h-64 place-items-center px-6 text-center"><div><WalletCards className="mx-auto size-8 text-slate-300"/><p className="mt-3 font-semibold text-slate-700">보유 종목이 없습니다</p><p className="mt-1 text-sm text-slate-400">선택한 계좌에 표시할 잔고가 없습니다.</p></div></div> : <HoldingsTable holdings={data.holdings} readOnly={isLive(environment)} onSell={(holding) => setSelectedTrade({ stock: { code: holding.code, name: holding.name, market: holding.market }, mode: 'sell', holdingQuantity: holding.quantity, availableQuantity: holding.availableQuantity })}/> }
+          <section className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.03)]"><div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4"><div><h2 className="font-bold">보유 종목</h2><p className="mt-1 text-xs text-slate-500">총 {data.holdings.length}개 종목</p></div><div className="flex flex-wrap items-center justify-end gap-3"><div className="flex items-center gap-1.5 text-[11px] text-slate-400"><Clock3 className="size-3.5"/>{new Date(data.asOf).toLocaleString('ko-KR')}</div><AccountCsvDownload holdings={data.holdings} asOf={data.asOf}/></div></div>
+            {data.holdings.length === 0 ? <div className="grid min-h-64 place-items-center px-6 text-center"><div><WalletCards className="mx-auto size-8 text-slate-300"/><p className="mt-3 font-semibold text-slate-700">보유 종목이 없습니다</p><p className="mt-1 text-sm text-slate-400">선택한 계좌에 표시할 잔고가 없습니다.</p></div></div> : <HoldingsTable holdings={data.holdings} readOnly={isLive(environment)} onSell={(holding) => setSelectedTrade({ stock: { code: holding.code, name: holding.name, market: holding.market }, mode: 'sell', holdingQuantity: holding.quantity, availableQuantity: holding.availableQuantity })}/>}
           </section>
         </> : null}
         </> : feature === 'search' ? <section>
