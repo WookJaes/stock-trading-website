@@ -9,6 +9,7 @@ import { RankingsView } from '@/components/rankings-view';
 import { LogoutButton } from '@/components/logout-button';
 import { HoldingsTable } from '@/components/holdings-table';
 import { AccountCsvDownload } from '@/components/account-csv-download';
+import { RecentStockSearches, useRecentStockSearches } from '@/components/recent-stock-searches';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { WatchlistButton, WatchlistProvider, WatchlistView } from '@/components/watchlist';
 
@@ -69,6 +70,7 @@ function Dashboard() {
   const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTrade, setSelectedTrade] = useState<SelectedTrade | null>(null);
+  const recentSearches = useRecentStockSearches();
   const query = useQuery({ queryKey: ['account', environment], queryFn: () => getAccount(environment), staleTime: 30_000, retry: 1, enabled: feature === 'account' });
   const stockQuery = useQuery({ queryKey: ['stocks', environment, searchTerm], queryFn: () => searchStocks(environment, searchTerm), enabled: feature === 'search' && searchTerm.length > 0, staleTime: 10 * 60_000, retry: 1 });
   const data = query.data;
@@ -116,10 +118,11 @@ function Dashboard() {
               <button type="button" onClick={() => isLive(environment) && changeEnvironment('domestic-live')} disabled={!isLive(environment) && !isDomestic(environment)} className={`rounded-lg px-4 py-2 text-sm font-semibold ${isDomestic(environment) ? 'bg-emerald-900 text-white' : isLive(environment) ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'cursor-not-allowed bg-slate-100 text-slate-400'}`}>국내</button>
               <button type="button" onClick={() => isLive(environment) && changeEnvironment('overseas-live')} disabled={!isLive(environment) && isDomestic(environment)} className={`rounded-lg px-4 py-2 text-sm font-semibold ${!isDomestic(environment) ? 'bg-emerald-900 text-white' : isLive(environment) ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'cursor-not-allowed bg-slate-100 text-slate-400'}`}>해외</button>
             </div>
-            <form onSubmit={(event) => { event.preventDefault(); setSearchTerm(searchInput.trim()); }} className="flex flex-col gap-2 sm:flex-row">
+            <form onSubmit={(event) => { event.preventDefault(); const search = searchInput.trim(); if (!search) return; setSearchInput(search); setSearchTerm(search); recentSearches.add(search); }} className="flex flex-col gap-2 sm:flex-row">
               <label className="relative flex-1"><span className="sr-only">종목명 또는 종목코드</span><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"/><input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder={isDomestic(environment) ? '예: 삼성전자, 005930' : '예: 테슬라, TSLA'} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm outline-none transition focus:border-emerald-700 focus:bg-white focus:ring-3 focus:ring-emerald-100"/></label>
               <button type="submit" disabled={!searchInput.trim() || stockQuery.isFetching} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-900 px-5 text-sm font-semibold text-white disabled:opacity-50">{stockQuery.isFetching ? <LoaderCircle className="size-4 animate-spin"/> : <Search className="size-4"/>}검색</button>
             </form>
+            <RecentStockSearches searches={recentSearches.searches} onSelect={(search) => { setSearchInput(search); setSearchTerm(search); recentSearches.add(search); }} onRemove={recentSearches.remove} onClear={recentSearches.clear}/>
           </div>
 
           <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white">
