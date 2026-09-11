@@ -46,8 +46,27 @@ async function domesticAccount(token: string) {
   return { environment: 'domestic-mock' as const, asOf: new Date().toISOString(), currency: 'KRW' as const, accountNotice: rows.length === 0 && parseNumber(data.prsm_dpst_aset_amt) === 0 && parseNumber(deposit.entr) === 0 ? '키움 모의투자 API가 현재 계좌의 조회 내역이 없다고 응답했습니다. 모의계좌의 자산 또는 연결된 앱 키를 확인해 주세요.' : undefined, cashBalance: parseNumber(deposit.entr), totalPurchaseAmount: parseNumber(data.tot_pur_amt), totalEvaluationAmount: parseNumber(data.tot_evlt_amt), totalProfitLoss: parseNumber(data.tot_evlt_pl), totalProfitRate: parseNumber(data.tot_prft_rt), estimatedAssets: parseNumber(data.prsm_dpst_aset_amt), holdings: rows.map((row) => ({ code: parseText(row.stk_cd).replace(/^[AJQ]/, ''), name: parseText(row.stk_nm), market: 'KRX', quantity: parseNumber(row.rmnd_qty), availableQuantity: parseNumber(row.trde_able_qty), averagePrice: parseNumber(row.pur_pric), currentPrice: Math.abs(parseNumber(row.cur_prc)), evaluationAmount: parseNumber(row.evlt_amt), profitLoss: parseNumber(row.evltv_prft), profitRate: parseNumber(row.prft_rt), currency: 'KRW' as const })) };
 }
 async function overseasAccount(token: string) {
-  const deposit = await requestKiwoom(token, 'ust21160', '/api/us/acnt', {});
-  return { environment: 'overseas-mock' as const, asOf: new Date().toISOString(), currency: 'KRW' as const, accountNotice: '키움 해외 모의투자는 전체 보유 종목 조회를 제공하지 않아 예수금만 표시합니다.', cashBalance: parseNumber(deposit.d0_won_conv_alow_ch), totalPurchaseAmount: 0, totalEvaluationAmount: 0, totalProfitLoss: 0, totalProfitRate: 0, holdings: [] };
+  const [valuation, deposit] = await Promise.all([
+    requestKiwoom(token, 'ust21120', '/api/us/acnt', { cmsn_incl_tp: '0', exrt_tp: '0' }),
+    requestKiwoom(token, 'ust21160', '/api/us/acnt', {}),
+  ]);
+  const currencyRows = Array.isArray(valuation.result_list) ? valuation.result_list as Record<string, unknown>[] : [];
+  const usd = currencyRows.find((row) => parseText(row.crnc_code) === 'USD');
+  return {
+    environment: 'overseas-mock' as const,
+    asOf: new Date().toISOString(),
+    currency: 'USD' as const,
+    accountNotice: usd ? '해외 계좌는 USD 외화예수금과 해외증권 평가금 기준으로 표시합니다.' : '키움 모의투자 API가 USD 계좌 내역을 반환하지 않았습니다.',
+    cashBalance: parseNumber(usd?.fx_entr ?? deposit.d0_usd_fx_entr),
+    cashBalanceKrw: parseNumber(valuation.won_entr ?? deposit.won_entr),
+    withdrawableKrw: parseNumber(deposit.d0_won_conv_alow_ch),
+    totalPurchaseAmount: 0,
+    totalEvaluationAmount: parseNumber(usd?.evlt_amt),
+    totalProfitLoss: 0,
+    totalProfitRate: 0,
+    estimatedAssets: parseNumber(valuation.aset_evlt_amt),
+    holdings: [],
+  };
 }
 
 export async function GET(request: NextRequest) {

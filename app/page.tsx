@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 
 type Environment = 'domestic-mock' | 'overseas-mock';
 type Holding = { code: string; name: string; market: string; quantity: number; availableQuantity: number; averagePrice: number; currentPrice: number; evaluationAmount: number; profitLoss: number; profitRate: number; currency: 'KRW' | 'USD' };
-type AccountData = { environment: Environment; asOf: string; currency: 'KRW' | 'USD'; accountNotice?: string; cashBalance: number; totalPurchaseAmount: number; totalEvaluationAmount: number; totalProfitLoss: number; totalProfitRate: number; estimatedAssets?: number; holdings: Holding[] };
+type AccountData = { environment: Environment; asOf: string; currency: 'KRW' | 'USD'; accountNotice?: string; cashBalance: number; cashBalanceKrw?: number; withdrawableKrw?: number; totalPurchaseAmount: number; totalEvaluationAmount: number; totalProfitLoss: number; totalProfitRate: number; estimatedAssets?: number; holdings: Holding[] };
 type Stock = { code: string; name: string; englishName?: string; market: string; sector?: string; isEtf?: boolean; status?: string };
 type SearchData = { results: Stock[]; total: number };
 type SelectedTrade = { stock: TradeStock; mode: 'buy' | 'sell'; holdingQuantity?: number; availableQuantity?: number };
@@ -93,7 +93,7 @@ function Dashboard() {
         {query.isPending ? <Loading/> : query.isError ? <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6"><div className="flex gap-3"><AlertCircle className="mt-0.5 size-5 shrink-0 text-amber-700"/><div><h2 className="font-semibold text-amber-950">계좌 정보를 연결하지 못했습니다</h2><p className="mt-1 text-sm text-amber-800">{query.error.message}</p><button type="button" onClick={() => query.refetch()} className="mt-4 rounded-lg bg-amber-900 px-3 py-2 text-xs font-semibold text-white">다시 시도</button></div></div></div> : data ? <>
           {data.accountNotice && <div className="mb-4 flex gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900"><AlertCircle className="mt-0.5 size-4 shrink-0"/><p>{data.accountNotice}</p></div>}
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[
-            { label: '예수금', value: data.cashBalance, sub: '계좌 내 현금성 자산' },
+            { label: '예수금', value: data.cashBalance, sub: environment === 'overseas-mock' ? `USD 외화예수금 · 원화 ${money(data.cashBalanceKrw ?? 0, 'KRW')} · 인출가능 ${money(data.withdrawableKrw ?? 0, 'KRW')}` : '계좌 내 현금성 자산' },
             { label: '총 평가금액', value: data.totalEvaluationAmount, sub: '보유 종목 평가금액' },
             { label: '총 평가손익', value: data.totalProfitLoss, change: true, sub: '평가금액 − 매입금액' },
             { label: '총 수익률', value: data.totalProfitRate, rate: true, change: true, sub: '보유자산 평가수익률' },
