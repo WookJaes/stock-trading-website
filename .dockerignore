@@ -1,0 +1,13 @@
+.git
+.openai
+.env
+.env.*
+!.env.example
+.next
+.vinext
+.wrangler
+dist
+node_modules
+npm-debug.log*
+.DS_Store
+docs
