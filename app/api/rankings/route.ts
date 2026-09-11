@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isDomestic, isKiwoomEnvironment, kiwoomCredentials, kiwoomDomain, type KiwoomEnvironment as Environment } from '@/lib/kiwoom-environment';
 
-type Environment = 'domestic-mock' | 'overseas-mock';
 type Category = 'value' | 'gainers' | 'volume' | 'popular';
 type KiwoomResponse = Record<string, unknown> & { return_code?: number; returnCode?: number; token?: string };
 
-const MOCK_DOMAIN = 'https://mockapi.kiwoom.com';
 const tokenCache = new Map<Environment, { value: string; expiresAt: number }>();
 
 function text(value: unknown) { return typeof value === 'string' || typeof value === 'number' ? String(value) : ''; }
@@ -12,19 +11,11 @@ function numeric(value: unknown) { const parsed = Number(text(value).replaceAll(
 function absolute(value: unknown) { return Math.abs(numeric(value)); }
 function market(value: unknown) { return ({ ND: 'NASDAQ', NY: 'NYSE', NA: 'AMEX' } as Record<string, string>)[text(value)] ?? text(value); }
 
-function credentials(environment: Environment) {
-  const domestic = environment === 'domestic-mock';
-  const appKey = process.env[domestic ? 'KIS_MOCK_DOMESTIC_APP_KEY' : 'KIS_MOCK_OVERSEAS_APP_KEY'] ?? process.env[domestic ? 'KIWOOM_MOCK_DOMESTIC_APP_KEY' : 'KIWOOM_MOCK_OVERSEAS_APP_KEY'];
-  const appSecret = process.env[domestic ? 'KIS_MOCK_DOMESTIC_APP_SECRET' : 'KIS_MOCK_OVERSEAS_APP_SECRET'] ?? process.env[domestic ? 'KIWOOM_MOCK_DOMESTIC_APP_SECRET' : 'KIWOOM_MOCK_OVERSEAS_APP_SECRET'];
-  if (!appKey || !appSecret) throw new Error('MISSING_CREDENTIALS');
-  return { appKey, appSecret };
-}
-
 async function getToken(environment: Environment) {
   const cached = tokenCache.get(environment);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
-  const { appKey, appSecret } = credentials(environment);
-  const response = await fetch(`${MOCK_DOMAIN}/oauth2/token`, { method: 'POST', headers: { 'Content-Type': 'application/json;charset=UTF-8' }, body: JSON.stringify({ grant_type: 'client_credentials', appkey: appKey, secretkey: appSecret }), cache: 'no-store' });
+  const { appKey, appSecret } = kiwoomCredentials(environment);
+  const response = await fetch(`${kiwoomDomain(environment)}/oauth2/token`, { method: 'POST', headers: { 'Content-Type': 'application/json;charset=UTF-8' }, body: JSON.stringify({ grant_type: 'client_credentials', appkey: appKey, secretkey: appSecret }), cache: 'no-store' });
   const data = await response.json() as KiwoomResponse;
   if (!response.ok || data.return_code !== 0 || !data.token) throw new Error('AUTHENTICATION_FAILED');
   tokenCache.set(environment, { value: data.token, expiresAt: Date.now() + 23 * 60 * 60 * 1000 });
@@ -46,9 +37,9 @@ const overseasRequests: Record<Category, { apiId: string; path: string; list: st
 };
 
 async function loadRanking(environment: Environment, category: Category) {
-  const config = (environment === 'domestic-mock' ? domesticRequests : overseasRequests)[category];
+  const config = (isDomestic(environment) ? domesticRequests : overseasRequests)[category];
   const token = await getToken(environment);
-  const response = await fetch(`${MOCK_DOMAIN}${config.path}`, { method: 'POST', headers: { 'Content-Type': 'application/json;charset=UTF-8', 'api-id': config.apiId, authorization: `Bearer ${token}` }, body: JSON.stringify(config.body), cache: 'no-store' });
+  const response = await fetch(`${kiwoomDomain(environment)}${config.path}`, { method: 'POST', headers: { 'Content-Type': 'application/json;charset=UTF-8', 'api-id': config.apiId, authorization: `Bearer ${token}` }, body: JSON.stringify(config.body), cache: 'no-store' });
   const data = await response.json() as KiwoomResponse;
   const returnCode = data.return_code ?? data.returnCode;
   if (!response.ok || returnCode !== 0) throw new Error('UPSTREAM_FAILED');
@@ -58,27 +49,27 @@ async function loadRanking(environment: Environment, category: Category) {
     code: text(row.stk_cd),
     name: text(row.stk_nm),
     englishName: text(row.stk_enm) || undefined,
-    market: environment === 'domestic-mock' ? 'KRX' : market(row.stex_tp),
+    market: isDomestic(environment) ? 'KRX' : market(row.stex_tp),
     currentPrice: absolute(row.cur_prc ?? row.past_curr_prc ?? row.curr_pric),
     change: numeric(row.pred_pre),
     changeRate: numeric(row.flu_rt ?? row.base_comp_chgr ?? row.diff_rate_for_gjga),
     volume: absolute(row.now_trde_qty ?? row.trde_qty ?? row.acc_trde_qty),
     tradeValue: absolute(row.trde_prica ?? row.trde_amt),
-    currency: environment === 'domestic-mock' ? 'KRW' : 'USD',
+    currency: isDomestic(environment) ? 'KRW' : 'USD',
   })).filter((item) => item.code && item.name);
 }
 
 export async function GET(request: NextRequest) {
   const environment = request.nextUrl.searchParams.get('environment');
   const category = request.nextUrl.searchParams.get('category');
-  if (environment !== 'domestic-mock' && environment !== 'overseas-mock') return NextResponse.json({ message: '지원하지 않는 투자 환경입니다.' }, { status: 400 });
+  if (!isKiwoomEnvironment(environment)) return NextResponse.json({ message: '지원하지 않는 투자 환경입니다.' }, { status: 400 });
   if (category !== 'value' && category !== 'gainers' && category !== 'volume' && category !== 'popular') return NextResponse.json({ message: '지원하지 않는 순위 유형입니다.' }, { status: 400 });
   try {
     return NextResponse.json({ environment, category, asOf: new Date().toISOString(), results: await loadRanking(environment, category) }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     const code = error instanceof Error ? error.message : 'UNKNOWN';
-    if (code === 'MISSING_CREDENTIALS') return NextResponse.json({ message: '선택한 모의투자 환경의 인증정보가 설정되지 않았습니다.' }, { status: 503 });
-    if (code === 'AUTHENTICATION_FAILED') return NextResponse.json({ message: '모의투자 인증에 실패했습니다.' }, { status: 502 });
+    if (code === 'MISSING_CREDENTIALS') return NextResponse.json({ message: '선택한 투자 환경의 인증정보가 설정되지 않았습니다.' }, { status: 503 });
+    if (code === 'AUTHENTICATION_FAILED') return NextResponse.json({ message: '키움 인증에 실패했습니다.' }, { status: 502 });
     return NextResponse.json({ message: '순위 정보를 불러오지 못했습니다.' }, { status: 502 });
   }
 }

@@ -5,7 +5,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { AlertCircle, CheckCircle2, LoaderCircle, RefreshCw, ShieldCheck, TrendingDown, TrendingUp, X } from 'lucide-react';
 
 export type TradeStock = { code: string; name: string; englishName?: string; market: string };
-type Environment = 'domestic-mock' | 'overseas-mock';
+type Environment = 'domestic-live' | 'overseas-live' | 'domestic-mock' | 'overseas-mock';
 type Detail = TradeStock & { currency: 'KRW' | 'USD'; currentPrice: number; change: number; changeRate: number; volume: number; high52: number; low52: number; status?: string; warning?: string; tradable: boolean; unavailableReason?: string };
 type OrderResponse = { success: boolean; orderNo: string; message: string };
 type OrderStatus = { status: 'checking' | 'pending' | 'filled'; statusLabel: string; orderedQuantity?: number; filledQuantity?: number; remainingQuantity?: number; filledPrice?: number; rejectedReason?: string };
@@ -20,6 +20,7 @@ function money(value: number, currency: 'KRW' | 'USD') { return new Intl.NumberF
 function count(value: number) { return new Intl.NumberFormat('ko-KR').format(value); }
 
 export function StockTradePanel({ stock, environment, mode = 'buy', holdingQuantity, availableQuantity, onClose }: { stock: TradeStock; environment: Environment; mode?: 'buy' | 'sell'; holdingQuantity?: number; availableQuantity?: number; onClose: () => void }) {
+  const live = environment.endsWith('-live');
   const [quantity, setQuantity] = useState('1');
   const [orderType, setOrderType] = useState<'market' | 'limit'>('market');
   const [price, setPrice] = useState('');
@@ -41,7 +42,7 @@ export function StockTradePanel({ stock, environment, mode = 'buy', holdingQuant
   const submitOrder = () => orderMutation.mutate(crypto.randomUUID());
 
   return <><button type="button" className="fixed inset-0 z-40 bg-slate-950/35 backdrop-blur-[2px]" onClick={onClose} aria-label="거래 패널 닫기"/><dialog open aria-label={`${stock.name} 거래 패널`} className="fixed inset-y-0 right-0 z-50 m-0 ml-auto flex h-full w-full max-w-lg flex-col overflow-y-auto border-0 border-l border-slate-200 bg-slate-50 p-0 shadow-2xl">
-    <header className="sticky top-0 z-10 flex items-start justify-between border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur"><div><p className={`text-xs font-semibold ${mode === 'sell' ? 'text-blue-700' : 'text-emerald-800'}`}>모의투자 {mode === 'sell' ? '매도' : '매수'}</p><h2 className="mt-1 text-xl font-bold">{stock.name}</h2><p className="mt-1 text-xs text-slate-500">{stock.code} · {stock.market}</p></div><button type="button" onClick={onClose} className="grid size-9 place-items-center rounded-lg hover:bg-slate-100" aria-label="닫기"><X className="size-5"/></button></header>
+    <header className="sticky top-0 z-10 flex items-start justify-between border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur"><div><p className={`text-xs font-semibold ${mode === 'sell' ? 'text-blue-700' : 'text-emerald-800'}`}>{live ? '실투자 종목 조회' : `모의투자 ${mode === 'sell' ? '매도' : '매수'}`}</p><h2 className="mt-1 text-xl font-bold">{stock.name}</h2><p className="mt-1 text-xs text-slate-500">{stock.code} · {stock.market}</p></div><button type="button" onClick={onClose} className="grid size-9 place-items-center rounded-lg hover:bg-slate-100" aria-label="닫기"><X className="size-5"/></button></header>
     <div className="space-y-4 p-4 sm:p-5">
       {notification && <div className={`flex gap-2 rounded-xl border p-3 text-sm ${notification.tone === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-rose-200 bg-rose-50 text-rose-900'}`}>{notification.tone === 'success' ? <CheckCircle2 className="size-4 shrink-0"/> : <AlertCircle className="size-4 shrink-0"/>}<p>{notification.message}</p></div>}
       {detailQuery.isPending ? <div className="grid min-h-48 place-items-center"><LoaderCircle className="size-6 animate-spin text-emerald-800"/></div> : detailQuery.isError ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{detailQuery.error.message}</div> : detail && <>
