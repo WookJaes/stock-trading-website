@@ -155,6 +155,9 @@ nano .env
 ```dotenv
 DOMAIN=stocks.example.com
 
+PASSWORD=<사이트 로그인 비밀번호>
+SESSION_SECRET=<충분히 긴 임의 문자열>
+
 KIS_REAL_APP_KEY=<실투자 앱 키>
 KIS_REAL_APP_SECRET=<실투자 시크릿>
 KIS_MOCK_DOMESTIC_APP_KEY=<국내 모의투자 앱 키>
@@ -167,6 +170,8 @@ KIS_MOCK_OVERSEAS_APP_SECRET=<해외 모의투자 시크릿>
 
 - `.env`를 Git에 추가하거나 Docker 이미지에 복사하지 않는다.
 - 앱 키, 시크릿, 접근 토큰을 명령행 인수나 로그로 출력하지 않는다.
+- `SESSION_SECRET`은 `openssl rand -base64 48` 등으로 생성해 `PASSWORD`와 다른 값으로 설정한다.
+- 로그인 세션은 8시간 동안 유지되며, 비밀번호나 세션 비밀키를 바꾼 뒤에는 `docker compose restart app`을 실행한다.
 - 실투자 인증정보는 조회 기능에만 사용한다. 화면에 주문 버튼이 보이지 않더라도 서버의 실투자 주문 차단 코드를 제거하지 않는다.
 - 키움에 Lightsail Static IP를 등록하기 전에는 실투자 인증이나 조회를 시험하지 않는다.
 

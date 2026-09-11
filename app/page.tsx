@@ -6,6 +6,7 @@ import { AlertCircle, BarChart3, BriefcaseBusiness, Building2, ChevronRight, Cir
 import { QueryProvider } from '@/components/query-provider';
 import { StockTradePanel, type TradeStock } from '@/components/stock-trade-panel';
 import { RankingsView } from '@/components/rankings-view';
+import { LogoutButton } from '@/components/logout-button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 type Environment = 'domestic-live' | 'overseas-live' | 'domestic-mock' | 'overseas-mock';
@@ -78,7 +79,7 @@ function Dashboard() {
         <div className="ml-auto flex items-center gap-1 rounded-xl bg-slate-100 p-1 sm:ml-0">
           {environments.map((item) => { const Icon = item.icon; const selected = item.id === 'live' ? isLive(environment) : item.id === environment; return <button key={item.id} type="button" disabled={item.disabled} onClick={() => !item.disabled && changeEnvironment(item.id === 'live' ? 'domestic-live' : item.id as Environment)} className={`flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold transition sm:px-3 ${selected ? 'bg-white text-emerald-900 shadow-sm ring-1 ring-slate-200' : item.disabled ? 'cursor-not-allowed text-slate-400' : 'text-slate-600 hover:bg-white/70 hover:text-slate-900'}`} aria-pressed={selected} title={item.label}><Icon className="size-3.5"/><span className="hidden min-[430px]:inline">{item.label}</span></button>; })}
         </div>
-        <div className="ml-auto hidden items-center gap-2 text-xs text-slate-500 md:flex"><ShieldCheck className="size-4 text-emerald-700"/>서버 보안 연결</div>
+        <div className="ml-auto hidden items-center gap-2 text-xs text-slate-500 md:flex"><ShieldCheck className="size-4 text-emerald-700"/>서버 보안 연결</div><LogoutButton/>
       </div>
     </header>
     {sidebarOpen && <button className="fixed inset-0 z-40 bg-slate-950/25 lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="메뉴 닫기"/>}
