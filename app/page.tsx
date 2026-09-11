@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, BarChart3, BriefcaseBusiness, Building2, ChevronRight, CircleDollarSign, Clock3, Globe2, LayoutDashboard, LoaderCircle, LockKeyhole, Menu, RefreshCw, Search, ShieldCheck, WalletCards, X } from 'lucide-react';
 import { QueryProvider } from '@/components/query-provider';
 import { StockTradePanel, type TradeStock } from '@/components/stock-trade-panel';
+import { RankingsView } from '@/components/rankings-view';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 type Environment = 'domestic-mock' | 'overseas-mock';
@@ -22,7 +23,7 @@ const environments = [
 const menuItems = [
   { id: 'account', label: '계좌 확인', icon: WalletCards },
   { id: 'search', label: '종목 검색', icon: Search },
-  { label: '시장 현황', icon: BarChart3, disabled: true },
+  { id: 'rankings', label: '순위', icon: BarChart3 },
   { label: '주문 관리', icon: BriefcaseBusiness, disabled: true },
 ];
 
@@ -57,7 +58,7 @@ function Loading() {
 function Dashboard() {
   const [environment, setEnvironment] = useState<Environment>(() => isUsMarketOpen() ? 'overseas-mock' : 'domestic-mock');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [feature, setFeature] = useState<'account' | 'search'>('account');
+  const [feature, setFeature] = useState<'account' | 'search' | 'rankings'>('account');
   const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTrade, setSelectedTrade] = useState<SelectedTrade | null>(null);
@@ -83,7 +84,7 @@ function Dashboard() {
       <aside className={`fixed inset-y-0 left-0 z-50 w-64 border-r border-slate-200 bg-white px-3 py-5 transition-transform lg:sticky lg:top-16 lg:z-10 lg:h-[calc(100vh-65px)] lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="mb-5 flex items-center justify-between px-3 lg:hidden"><span className="text-sm font-bold">메뉴</span><button type="button" onClick={() => setSidebarOpen(false)} aria-label="메뉴 닫기" className="grid size-8 place-items-center rounded-lg hover:bg-slate-100"><X className="size-4"/></button></div>
         <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Workspace</p>
-        <nav aria-label="주요 기능" className="space-y-1">{menuItems.map((item) => { const Icon = item.icon; const active = item.id === feature; return <button key={item.label} type="button" disabled={item.disabled} onClick={() => { if (item.id === 'account' || item.id === 'search') setFeature(item.id); setSidebarOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium ${active ? 'bg-emerald-50 text-emerald-900' : item.disabled ? 'text-slate-400' : 'text-slate-600 hover:bg-slate-50'}`}><Icon className="size-4"/>{item.label}{active && <ChevronRight className="ml-auto size-4"/>}{item.disabled && <span className="ml-auto text-[10px]">준비 중</span>}</button>; })}</nav>
+        <nav aria-label="주요 기능" className="space-y-1">{menuItems.map((item) => { const Icon = item.icon; const active = item.id === feature; return <button key={item.label} type="button" disabled={item.disabled} onClick={() => { if (item.id === 'account' || item.id === 'search' || item.id === 'rankings') setFeature(item.id); setSidebarOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium ${active ? 'bg-emerald-50 text-emerald-900' : item.disabled ? 'text-slate-400' : 'text-slate-600 hover:bg-slate-50'}`}><Icon className="size-4"/>{item.label}{active && <ChevronRight className="ml-auto size-4"/>}{item.disabled && <span className="ml-auto text-[10px]">준비 중</span>}</button>; })}</nav>
         <div className="absolute bottom-5 left-3 right-3 rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="flex gap-2.5"><ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-700"/><div><p className="text-xs font-semibold text-slate-700">모의투자 전용</p><p className="mt-1 text-[11px] leading-relaxed text-slate-500">인증정보는 브라우저에 노출되지 않습니다.</p></div></div></div>
       </aside>
       <section className="min-w-0 flex-1 px-4 py-6 md:px-8 md:py-8 xl:px-10"><div className="mx-auto max-w-[1440px]">
@@ -101,7 +102,7 @@ function Dashboard() {
             {data.holdings.length === 0 ? <div className="grid min-h-64 place-items-center px-6 text-center"><div><WalletCards className="mx-auto size-8 text-slate-300"/><p className="mt-3 font-semibold text-slate-700">보유 종목이 없습니다</p><p className="mt-1 text-sm text-slate-400">선택한 모의투자 계좌에 표시할 잔고가 없습니다.</p></div></div> : <Table><TableHeader className="bg-slate-50/80"><TableRow className="hover:bg-slate-50/80"><TableHead className="h-11 pl-5 text-xs text-slate-500">종목</TableHead><TableHead className="text-right text-xs text-slate-500">보유 / 가능</TableHead><TableHead className="text-right text-xs text-slate-500">평균단가</TableHead><TableHead className="text-right text-xs text-slate-500">현재가</TableHead><TableHead className="text-right text-xs text-slate-500">평가금액</TableHead><TableHead className="text-right text-xs text-slate-500">평가손익</TableHead><TableHead className="pr-5 text-right text-xs text-slate-500">주문</TableHead></TableRow></TableHeader><TableBody>{data.holdings.map((holding) => <TableRow key={`${holding.market}-${holding.code}`}><TableCell className="py-4 pl-5"><div className="font-semibold text-slate-800">{holding.name}</div><div className="mt-1 text-[11px] text-slate-400">{holding.code} · {holding.market}</div></TableCell><TableCell className="text-right tabular-nums">{number(holding.quantity, 4)} <span className="text-slate-300">/</span> {number(holding.availableQuantity, 4)}</TableCell><TableCell className="text-right tabular-nums">{money(holding.averagePrice, holding.currency)}</TableCell><TableCell className="text-right font-medium tabular-nums">{money(holding.currentPrice, holding.currency)}</TableCell><TableCell className="text-right font-medium tabular-nums">{money(holding.evaluationAmount, holding.currency)}</TableCell><TableCell className="text-right"><Change value={holding.profitLoss}/><div className="mt-1 text-[11px]"><Change value={holding.profitRate} suffix="%"/></div></TableCell><TableCell className="pr-5 text-right"><button type="button" disabled={holding.availableQuantity <= 0} onClick={() => setSelectedTrade({ stock: { code: holding.code, name: holding.name, market: holding.market }, mode: 'sell', holdingQuantity: holding.quantity, availableQuantity: holding.availableQuantity })} className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-40">매도</button></TableCell></TableRow>)}</TableBody></Table>}
           </section>
         </> : null}
-        </> : <section>
+        </> : feature === 'search' ? <section>
           <div className="mb-6"><div className="mb-2 flex items-center gap-2 text-xs font-semibold text-emerald-800"><Search className="size-3.5"/>종목 검색</div><h1 className="text-2xl font-bold tracking-tight md:text-3xl">투자 종목 찾기</h1><p className="mt-2 text-sm text-slate-500">종목명 또는 종목코드로 검색합니다.</p></div>
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)] sm:p-5">
             <div className="mb-4 flex gap-2" aria-label="검색 시장">
@@ -118,7 +119,7 @@ function Dashboard() {
             <div className="border-b border-slate-200 px-5 py-4"><h2 className="font-bold">검색 결과</h2><p className="mt-1 text-xs text-slate-500">{searchTerm ? stockQuery.data ? `총 ${number(stockQuery.data.total)}개 중 최대 50개 표시` : '검색 중' : '검색어를 입력해 주세요.'}</p></div>
             {stockQuery.isFetching ? <div className="grid min-h-56 place-items-center"><div className="text-center"><LoaderCircle className="mx-auto size-6 animate-spin text-emerald-800"/><p className="mt-3 text-sm text-slate-500">종목 목록을 검색하고 있습니다.</p></div></div> : stockQuery.isError ? <div className="m-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><div className="flex gap-2"><AlertCircle className="size-4 shrink-0"/><p>{stockQuery.error.message}</p></div></div> : !searchTerm ? <div className="grid min-h-56 place-items-center text-center"><div><Search className="mx-auto size-8 text-slate-300"/><p className="mt-3 text-sm text-slate-500">검색 결과가 여기에 표시됩니다.</p></div></div> : stockQuery.data?.results.length === 0 ? <div className="grid min-h-56 place-items-center text-center"><div><Search className="mx-auto size-8 text-slate-300"/><p className="mt-3 font-semibold text-slate-700">검색 결과가 없습니다</p><p className="mt-1 text-sm text-slate-400">종목명이나 종목코드를 다시 확인해 주세요.</p></div></div> : <Table><TableHeader className="bg-slate-50/80"><TableRow><TableHead className="pl-5">종목명</TableHead><TableHead>종목코드</TableHead><TableHead>시장</TableHead><TableHead className="pr-5">업종·상태</TableHead></TableRow></TableHeader><TableBody>{stockQuery.data?.results.map((stock) => <TableRow key={`${stock.market}-${stock.code}`}><TableCell className="py-2 pl-3"><button type="button" onClick={() => setSelectedTrade({ stock, mode: 'buy' })} className="w-full rounded-lg px-2 py-2 text-left hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-emerald-700"><div className="font-semibold text-slate-800">{stock.name || stock.englishName}</div>{stock.englishName && <div className="mt-1 text-xs text-slate-400">{stock.englishName}</div>}</button></TableCell><TableCell className="font-mono text-sm font-semibold text-slate-700">{stock.code}</TableCell><TableCell><span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">{stock.market}</span></TableCell><TableCell className="pr-5 text-sm text-slate-500">{stock.sector || stock.status || (stock.isEtf ? 'ETF' : '-')}</TableCell></TableRow>)}</TableBody></Table>}
           </div>
-        </section>}
+        </section> : <RankingsView key={environment} environment={environment} onSelect={(stock) => setSelectedTrade({ stock, mode: 'buy' })}/>}
       </div></section>
     </div>
     {selectedTrade && <StockTradePanel stock={selectedTrade.stock} environment={environment} mode={selectedTrade.mode} holdingQuantity={selectedTrade.holdingQuantity} availableQuantity={selectedTrade.availableQuantity} onClose={() => setSelectedTrade(null)}/>}
