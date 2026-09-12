@@ -54,6 +54,9 @@ cp .env.example .env
 PASSWORD=<사이트 로그인 비밀번호>
 SESSION_SECRET=<충분히 긴 임의 문자열>
 
+TELEGRAM_BOT_TOKEN=<Telegram 봇 토큰>
+TELEGRAM_CHAT_ID=<알림을 받을 채팅 ID>
+
 KIS_REAL_APP_KEY=<실투자 앱 키>
 KIS_REAL_APP_SECRET=<실투자 앱 시크릿>
 
@@ -71,6 +74,8 @@ openssl rand -base64 48
 ```
 
 실제 `.env`는 Git에 커밋하지 않습니다.
+
+Telegram 환경변수는 로그인 및 모의투자 매수·매도 전량 체결 알림에 사용됩니다. 알림 종류는 로그인 후 `알림 설정` 메뉴에서 각각 켜거나 끌 수 있습니다.
 
 ### 개발 서버
 

@@ -134,6 +134,9 @@ DOMAIN=:80
 PASSWORD=<사이트 로그인 비밀번호>
 SESSION_SECRET=<충분히 긴 임의 문자열>
 
+TELEGRAM_BOT_TOKEN=<Telegram 봇 토큰>
+TELEGRAM_CHAT_ID=<알림을 받을 채팅 ID>
+
 KIS_REAL_APP_KEY=<실투자 앱 키>
 KIS_REAL_APP_SECRET=<실투자 시크릿>
 KIS_MOCK_DOMESTIC_APP_KEY=<국내 모의투자 앱 키>
@@ -152,6 +155,7 @@ openssl rand -base64 48
 - 이 프로젝트는 `SITE_URL`을 사용하지 않는다.
 - `.env`를 Git이나 Docker 이미지에 포함하지 않는다.
 - 비밀번호, 세션 비밀키 및 키움 인증정보를 화면이나 로그에 출력하지 않는다.
+- Telegram 봇 토큰과 채팅 ID도 서버의 `.env`에만 저장하고 저장소에 커밋하지 않는다.
 - Nano 저장은 `Control+O`, `Enter`, 종료는 `Control+X`다.
 
 ## 8. 최초 빌드와 실행

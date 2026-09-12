@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isDomestic, isKiwoomEnvironment, isLive, kiwoomCredentials, kiwoomDomain, type KiwoomEnvironment as Environment } from '@/lib/kiwoom-environment';
+import { notificationPreferencesCookie, parseNotificationPreferences } from '@/lib/notification-preferences';
+import { sendTelegramNotification } from '@/lib/telegram';
 
 type KiwoomResponse = Record<string, unknown> & { return_code?: number; token?: string; return_msg?: string };
 const tokenCache = new Map<Environment, { value: string; expiresAt: number }>();
 const orders = new Map<string, { response: unknown; expiresAt: number }>();
+const notifiedFills = new Map<string, number>();
 
 function text(value: unknown) { return typeof value === 'string' || typeof value === 'number' ? String(value) : ''; }
 function number(value: unknown) { const parsed = Number(text(value).replaceAll(',', '')); return Number.isFinite(parsed) ? parsed : 0; }
@@ -30,6 +33,15 @@ function kstDate() {
   return `${get('year')}${get('month')}${get('day')}`;
 }
 function marketCode(market: string) { return market === 'NASDAQ' ? 'ND' : market === 'NYSE' ? 'NY' : market === 'AMEX' ? 'NA' : ''; }
+async function notifyFilled(request: NextRequest, details: { environment: Environment; side: 'buy' | 'sell'; code: string; market: string; orderNo: string; quantity: number; price: number }) {
+  const key = `${details.environment}:${details.side}:${details.orderNo}`;
+  const now = Date.now();
+  for (const [storedKey, expiresAt] of notifiedFills) if (expiresAt <= now) notifiedFills.delete(storedKey);
+  if (notifiedFills.has(key)) return;
+  notifiedFills.set(key, now + 24 * 60 * 60_000);
+  const result = await sendTelegramNotification({ type: details.side === 'buy' ? 'buyFilled' : 'sellFilled', environment: details.environment, code: details.code, market: details.market, orderNo: details.orderNo, quantity: details.quantity, price: details.price }, parseNotificationPreferences(request.cookies.get(notificationPreferencesCookie.name)?.value));
+  if (!result.sent && result.reason !== 'disabled') notifiedFills.delete(key);
+}
 
 export async function GET(request: NextRequest) {
   const env = environment(request.nextUrl.searchParams.get('environment'));
@@ -59,13 +71,27 @@ export async function GET(request: NextRequest) {
         const data = await call(env, token, 'kt00007', '/api/dostk/acnt', { ord_dt: kstDate(), qry_tp: '1', stk_bond_tp: '1', sell_tp: side === 'sell' ? '1' : '2', stk_cd: code, fr_ord_no: '', dmst_stex_tp: 'KRX' });
         const rows = Array.isArray(data.acnt_ord_cntr_prps_dtl) ? data.acnt_ord_cntr_prps_dtl as Record<string, unknown>[] : [];
         const row = rows.find((item) => text(item.ord_no) === orderNo);
-        return NextResponse.json(row ? { status: number(row.ord_remnq) === 0 ? 'filled' : 'pending', statusLabel: number(row.ord_remnq) === 0 ? '체결 완료' : '미체결', orderedQuantity: number(row.ord_qty), filledQuantity: number(row.cntr_qty), remainingQuantity: number(row.ord_remnq), filledPrice: number(row.cntr_uv) } : { status: 'checking', statusLabel: '체결 확인 중' });
+        if (!row) return NextResponse.json({ status: 'checking', statusLabel: '체결 확인 중' });
+        const orderedQuantity = number(row.ord_qty);
+        const filledQuantity = number(row.cntr_qty);
+        const remainingQuantity = number(row.ord_remnq);
+        const status = orderedQuantity > 0 && remainingQuantity === 0 && filledQuantity >= orderedQuantity ? 'filled' : 'pending';
+        const result = { status, statusLabel: status === 'filled' ? '체결 완료' : '미체결', orderedQuantity, filledQuantity, remainingQuantity, filledPrice: number(row.cntr_uv) };
+        if (status === 'filled') await notifyFilled(request, { environment: env, side, code, market, orderNo, quantity: result.filledQuantity, price: result.filledPrice });
+        return NextResponse.json(result);
       }
       const stex_tp = marketCode(market);
       const data = await call(env, token, 'ust21150', '/api/us/acnt', { ord_dt: '', query_tp: '1', slby_tp: side === 'sell' ? '1' : '2', stex_tp, stk_cd: code, oppo_trde_tp: '0', fr_ord_no: '' });
       const rows = Array.isArray(data.result_list) ? data.result_list as Record<string, unknown>[] : [];
       const row = rows.find((item) => text(item.ord_no) === orderNo);
-      return NextResponse.json(row ? { status: number(row.ord_remnq) === 0 ? 'filled' : 'pending', statusLabel: text(row.ord_stat_nm), orderedQuantity: number(row.ord_qty), filledQuantity: number(row.cntr_qty), remainingQuantity: number(row.ord_remnq), filledPrice: number(row.cntr_uv), rejectedReason: text(row.text1) } : { status: 'checking', statusLabel: '체결 확인 중' });
+      if (!row) return NextResponse.json({ status: 'checking', statusLabel: '체결 확인 중' });
+      const orderedQuantity = number(row.ord_qty);
+      const filledQuantity = number(row.cntr_qty);
+      const remainingQuantity = number(row.ord_remnq);
+      const status = text(row.ord_stat_nm) === '체결완료' && orderedQuantity > 0 && remainingQuantity === 0 && filledQuantity >= orderedQuantity ? 'filled' : 'pending';
+      const result = { status, statusLabel: text(row.ord_stat_nm), orderedQuantity, filledQuantity, remainingQuantity, filledPrice: number(row.cntr_uv), rejectedReason: text(row.text1) };
+      if (status === 'filled') await notifyFilled(request, { environment: env, side, code, market, orderNo, quantity: result.filledQuantity, price: result.filledPrice });
+      return NextResponse.json(result);
     }
     return NextResponse.json({ message: '지원하지 않는 요청입니다.' }, { status: 400 });
   } catch (error) {

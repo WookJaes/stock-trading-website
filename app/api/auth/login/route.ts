@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authCookie, createSession, verifyPassword } from '@/lib/auth';
 import { clearLoginFailures, loginLimit, recordLoginFailure } from '@/lib/login-rate-limit';
+import { notificationPreferencesCookie, parseNotificationPreferences } from '@/lib/notification-preferences';
+import { sendTelegramNotification } from '@/lib/telegram';
 
 function clientKey(request: NextRequest) {
   return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || 'unknown';
@@ -34,5 +36,6 @@ export async function POST(request: NextRequest) {
   clearLoginFailures(key);
   const response = NextResponse.json({ success: true });
   response.cookies.set(authCookie.name, await createSession(), { ...authCookie.options, maxAge: authCookie.maxAge });
+  await sendTelegramNotification({ type: 'login' }, parseNotificationPreferences(request.cookies.get(notificationPreferencesCookie.name)?.value));
   return response;
 }

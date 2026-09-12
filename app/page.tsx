@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { AlertCircle, BarChart3, BriefcaseBusiness, Building2, ChevronRight, CircleDollarSign, Clock3, Globe2, LayoutDashboard, LoaderCircle, LockKeyhole, Menu, RefreshCw, Search, ShieldCheck, Star, WalletCards, X } from 'lucide-react';
+import { AlertCircle, BarChart3, BellRing, BriefcaseBusiness, Building2, ChevronRight, CircleDollarSign, Clock3, Globe2, LayoutDashboard, LoaderCircle, LockKeyhole, Menu, RefreshCw, Search, ShieldCheck, Star, WalletCards, X } from 'lucide-react';
 import { QueryProvider } from '@/components/query-provider';
 import { StockTradePanel, type TradeStock } from '@/components/stock-trade-panel';
 import { RankingsView } from '@/components/rankings-view';
@@ -12,6 +12,7 @@ import { AccountCsvDownload } from '@/components/account-csv-download';
 import { RecentStockSearches, useRecentStockSearches } from '@/components/recent-stock-searches';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { WatchlistButton, WatchlistProvider, WatchlistView } from '@/components/watchlist';
+import { NotificationSettings } from '@/components/notification-settings';
 
 type Environment = 'domestic-live' | 'overseas-live' | 'domestic-mock' | 'overseas-mock';
 type Holding = { code: string; name: string; market: string; quantity: number; availableQuantity: number; averagePrice: number; currentPrice: number; evaluationAmount: number; profitLoss: number; profitRate: number; currency: 'KRW' | 'USD' };
@@ -30,6 +31,7 @@ const menuItems = [
   { id: 'search', label: '종목 검색', icon: Search },
   { id: 'rankings', label: '순위', icon: BarChart3 },
   { id: 'watchlist', label: '관심종목', icon: Star },
+  { id: 'notifications', label: '알림 설정', icon: BellRing },
   { label: '주문 관리', icon: BriefcaseBusiness, disabled: true },
 ];
 
@@ -66,7 +68,7 @@ function Loading() {
 function Dashboard() {
   const [environment, setEnvironment] = useState<Environment>(() => isUsMarketOpen() ? 'overseas-mock' : 'domestic-mock');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [feature, setFeature] = useState<'account' | 'search' | 'rankings' | 'watchlist'>('account');
+  const [feature, setFeature] = useState<'account' | 'search' | 'rankings' | 'watchlist' | 'notifications'>('account');
   const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTrade, setSelectedTrade] = useState<SelectedTrade | null>(null);
@@ -93,7 +95,7 @@ function Dashboard() {
       <aside className={`fixed inset-y-0 left-0 z-50 w-64 border-r border-slate-200 bg-white px-3 py-5 transition-transform lg:sticky lg:top-16 lg:z-10 lg:h-[calc(100vh-65px)] lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="mb-5 flex items-center justify-between px-3 lg:hidden"><span className="text-sm font-bold">메뉴</span><button type="button" onClick={() => setSidebarOpen(false)} aria-label="메뉴 닫기" className="grid size-8 place-items-center rounded-lg hover:bg-slate-100"><X className="size-4"/></button></div>
         <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Workspace</p>
-        <nav aria-label="주요 기능" className="space-y-1">{menuItems.map((item) => { const Icon = item.icon; const active = item.id === feature; return <button key={item.label} type="button" disabled={item.disabled} onClick={() => { if (item.id === 'account' || item.id === 'search' || item.id === 'rankings' || item.id === 'watchlist') setFeature(item.id); setSidebarOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium ${active ? 'bg-emerald-50 text-emerald-900' : item.disabled ? 'text-slate-400' : 'text-slate-600 hover:bg-slate-50'}`}><Icon className="size-4"/>{item.label}{active && <ChevronRight className="ml-auto size-4"/>}{item.disabled && <span className="ml-auto text-[10px]">준비 중</span>}</button>; })}</nav>
+        <nav aria-label="주요 기능" className="space-y-1">{menuItems.map((item) => { const Icon = item.icon; const active = item.id === feature; return <button key={item.label} type="button" disabled={item.disabled} onClick={() => { if (item.id === 'account' || item.id === 'search' || item.id === 'rankings' || item.id === 'watchlist' || item.id === 'notifications') setFeature(item.id); setSidebarOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium ${active ? 'bg-emerald-50 text-emerald-900' : item.disabled ? 'text-slate-400' : 'text-slate-600 hover:bg-slate-50'}`}><Icon className="size-4"/>{item.label}{active && <ChevronRight className="ml-auto size-4"/>}{item.disabled && <span className="ml-auto text-[10px]">준비 중</span>}</button>; })}</nav>
         <div className="absolute bottom-5 left-3 right-3 rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="flex gap-2.5"><ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-700"/><div><p className="text-xs font-semibold text-slate-700">{isLive(environment) ? '실투자 조회 전용' : '모의투자 환경'}</p><p className="mt-1 text-[11px] leading-relaxed text-slate-500">{isLive(environment) ? '매수·매도 주문은 비활성화되어 있습니다.' : '인증정보는 브라우저에 노출되지 않습니다.'}</p></div></div></div>
       </aside>
       <section className="min-w-0 flex-1 px-4 py-6 md:px-8 md:py-8 xl:px-10"><div className="mx-auto max-w-[1440px]">
@@ -129,7 +131,7 @@ function Dashboard() {
             <div className="border-b border-slate-200 px-5 py-4"><h2 className="font-bold">검색 결과</h2><p className="mt-1 text-xs text-slate-500">{searchTerm ? stockQuery.data ? `총 ${number(stockQuery.data.total)}개 중 최대 50개 표시` : '검색 중' : '검색어를 입력해 주세요.'}</p></div>
             {stockQuery.isFetching ? <div className="grid min-h-56 place-items-center"><div className="text-center"><LoaderCircle className="mx-auto size-6 animate-spin text-emerald-800"/><p className="mt-3 text-sm text-slate-500">종목 목록을 검색하고 있습니다.</p></div></div> : stockQuery.isError ? <div className="m-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><div className="flex gap-2"><AlertCircle className="size-4 shrink-0"/><p>{stockQuery.error.message}</p></div></div> : !searchTerm ? <div className="grid min-h-56 place-items-center text-center"><div><Search className="mx-auto size-8 text-slate-300"/><p className="mt-3 text-sm text-slate-500">검색 결과가 여기에 표시됩니다.</p></div></div> : stockQuery.data?.results.length === 0 ? <div className="grid min-h-56 place-items-center text-center"><div><Search className="mx-auto size-8 text-slate-300"/><p className="mt-3 font-semibold text-slate-700">검색 결과가 없습니다</p><p className="mt-1 text-sm text-slate-400">종목명이나 종목코드를 다시 확인해 주세요.</p></div></div> : <Table><TableHeader className="bg-slate-50/80"><TableRow><TableHead className="pl-5">종목명</TableHead><TableHead>종목코드</TableHead><TableHead>시장</TableHead><TableHead>업종·상태</TableHead><TableHead className="w-16 pr-5"><span className="sr-only">관심종목</span></TableHead></TableRow></TableHeader><TableBody>{stockQuery.data?.results.map((stock) => <TableRow key={`${stock.market}-${stock.code}`}><TableCell className="py-2 pl-3"><button type="button" onClick={() => setSelectedTrade({ stock, mode: 'buy' })} className="w-full rounded-lg px-2 py-2 text-left hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-emerald-700"><div className="font-semibold text-slate-800">{stock.name || stock.englishName}</div>{stock.englishName && <div className="mt-1 text-xs text-slate-400">{stock.englishName}</div>}</button></TableCell><TableCell className="font-mono text-sm font-semibold text-slate-700">{stock.code}</TableCell><TableCell><span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">{stock.market}</span></TableCell><TableCell className="text-sm text-slate-500">{stock.sector || stock.status || (stock.isEtf ? 'ETF' : '-')}</TableCell><TableCell className="pr-5"><WatchlistButton stock={{ ...stock, name: stock.name || stock.englishName || stock.code }}/></TableCell></TableRow>)}</TableBody></Table>}
           </div>
-        </section> : feature === 'rankings' ? <RankingsView key={environment} environment={environment} onEnvironmentChange={changeEnvironment} onSelect={(stock) => setSelectedTrade({ stock, mode: 'buy' })}/> : <WatchlistView onSelect={(stock) => setSelectedTrade({ stock, mode: 'buy' })}/>}
+        </section> : feature === 'rankings' ? <RankingsView key={environment} environment={environment} onEnvironmentChange={changeEnvironment} onSelect={(stock) => setSelectedTrade({ stock, mode: 'buy' })}/> : feature === 'watchlist' ? <WatchlistView onSelect={(stock) => setSelectedTrade({ stock, mode: 'buy' })}/> : <NotificationSettings/>}
       </div></section>
     </div>
     {selectedTrade && <StockTradePanel stock={selectedTrade.stock} environment={environment} mode={selectedTrade.mode} holdingQuantity={selectedTrade.holdingQuantity} availableQuantity={selectedTrade.availableQuantity} onClose={() => setSelectedTrade(null)}/>}
