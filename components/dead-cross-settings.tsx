@@ -4,15 +4,11 @@ import { useState, useSyncExternalStore } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertCircle,
-  CheckCircle2,
-  Clipboard,
-  Download,
   Info,
   LoaderCircle,
   Search,
   TrendingDown,
   Trash2,
-  Upload,
 } from 'lucide-react';
 import {
   ExcludedStockList,
@@ -109,15 +105,9 @@ export function DeadCrossSettings({
     parseStrategySettings(settingsText) ?? defaultStrategySettings;
   const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [importText, setImportText] = useState('');
-  const [importMessage, setImportMessage] = useState<
-    { type: 'success' | 'error'; text: string } | undefined
-  >();
-  const [copied, setCopied] = useState(false);
   const market = environmentMarket(environment);
   const markets = availableMarkets(environment);
   const marketSettings = settings.strategies.deadCross[market];
-  const exportedText = serializeStrategySettings(settings);
   const query = useQuery({
     queryKey: ['dead-cross-excluded-stock-search', environment, searchTerm],
     queryFn: () => searchStocks(environment, searchTerm),
@@ -177,33 +167,6 @@ export function DeadCrossSettings({
     });
   }
 
-  function importSettings() {
-    const parsed = parseStrategySettings(importText);
-    if (!parsed) {
-      setImportMessage({
-        type: 'error',
-        text: 'JSON 형식이나 설정값을 확인해 주세요.',
-      });
-      return;
-    }
-    saveSettings(parsed);
-    setImportText('');
-    setImportMessage({
-      type: 'success',
-      text: '전체 전략 설정을 가져왔습니다.',
-    });
-  }
-
-  async function copySettings() {
-    try {
-      await navigator.clipboard.writeText(exportedText);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    } catch {
-      setCopied(false);
-    }
-  }
-
   const inputClass =
     'mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold tabular-nums outline-none focus:border-emerald-700 focus:ring-3 focus:ring-emerald-100';
 
@@ -241,7 +204,7 @@ export function DeadCrossSettings({
         </p>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.72fr)]">
+      <div className="max-w-4xl">
         <div className="space-y-5">
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
             <div className="mb-5">
@@ -487,72 +450,6 @@ export function DeadCrossSettings({
           </section>
         </div>
 
-        <section className="self-start rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.03)] xl:sticky xl:top-24">
-          <div className="mb-5">
-            <h2 className="font-bold">전체 전략 설정</h2>
-            <p className="mt-1 text-xs leading-5 text-slate-500">
-              향후 추가되는 전략도 같은 JSON의 strategies 아래에 함께 저장할 수
-              있습니다.
-            </p>
-          </div>
-          <div className="flex items-center justify-between">
-            <label
-              htmlFor="strategy-export"
-              className="text-sm font-bold text-slate-800"
-            >
-              내보내기
-            </label>
-            <button
-              type="button"
-              onClick={copySettings}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-800"
-            >
-              {copied ? (
-                <CheckCircle2 className="size-3.5" />
-              ) : (
-                <Clipboard className="size-3.5" />
-              )}
-              {copied ? '복사됨' : '텍스트 복사'}
-            </button>
-          </div>
-          <textarea
-            id="strategy-export"
-            readOnly
-            value={exportedText}
-            rows={12}
-            className="mt-2 w-full resize-y rounded-xl border border-slate-200 bg-slate-50 p-3 font-mono text-[11px] leading-5 text-slate-600 outline-none"
-          />
-          <div className="mt-6 flex items-center gap-2 text-sm font-bold text-slate-800">
-            <Upload className="size-4 text-emerald-800" />
-            가져오기
-          </div>
-          <textarea
-            value={importText}
-            onChange={(event) => {
-              setImportText(event.target.value);
-              setImportMessage(undefined);
-            }}
-            rows={7}
-            placeholder="전체 전략 설정 JSON을 붙여 넣으세요."
-            className="mt-2 w-full resize-y rounded-xl border border-slate-200 bg-white p-3 font-mono text-[11px] leading-5 outline-none focus:border-emerald-700 focus:ring-3 focus:ring-emerald-100"
-          />
-          <button
-            type="button"
-            disabled={!importText.trim()}
-            onClick={importSettings}
-            className="mt-2 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white disabled:opacity-40"
-          >
-            <Download className="size-4" />
-            전체 설정 가져오기
-          </button>
-          {importMessage && (
-            <output
-              className={`mt-3 text-xs ${importMessage.type === 'success' ? 'text-emerald-700' : 'text-rose-700'}`}
-            >
-              {importMessage.text}
-            </output>
-          )}
-        </section>
       </div>
     </section>
   );
