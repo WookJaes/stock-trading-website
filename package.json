@@ -10,7 +10,7 @@
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "build": "vinext build",
     "start": "vinext start",
-    "lint": "oxlint app proxy.ts components/query-provider.tsx components/logout-button.tsx components/account-csv-download.tsx components/notification-settings.tsx components/order-quantity-controls.tsx components/recent-stock-searches.tsx components/rankings-view.tsx components/stock-trade-panel.tsx components/watchlist.tsx components/ui/table.tsx lib tests",
+    "lint": "oxlint app proxy.ts components/query-provider.tsx components/logout-button.tsx components/account-csv-download.tsx components/notification-settings.tsx components/order-quantity-controls.tsx components/recent-stock-searches.tsx components/rankings-view.tsx components/sl-tp-settings.tsx components/strategy-controls.tsx components/stock-trade-panel.tsx components/watchlist.tsx components/ui/table.tsx lib tests",
     "format": "oxfmt"
   },
   "dependencies": {
