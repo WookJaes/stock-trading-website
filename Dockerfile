@@ -13,6 +13,8 @@ ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=3000
 COPY --from=builder --chown=node:node /app/dist/standalone ./
+COPY --from=builder --chown=node:node /app/dist/worker ./worker
+RUN mkdir -p /app/.data && chown node:node /app/.data
 USER node
 EXPOSE 3000
 CMD ["node", "server.js"]

@@ -137,6 +137,9 @@ SESSION_SECRET=<충분히 긴 임의 문자열>
 TELEGRAM_BOT_TOKEN=<Telegram 봇 토큰>
 TELEGRAM_CHAT_ID=<알림을 받을 채팅 ID>
 
+# 처음에는 반드시 false로 두고 모의투자 신호 기록부터 확인한다.
+ENABLE_MOCK_STRATEGY_ORDERS=false
+
 KIS_REAL_APP_KEY=<실투자 앱 키>
 KIS_REAL_APP_SECRET=<실투자 시크릿>
 KIS_MOCK_DOMESTIC_APP_KEY=<국내 모의투자 앱 키>
@@ -171,6 +174,7 @@ docker compose ps
 
 ```text
 app      Up ... (healthy)
+strategy-worker  Up ...
 caddy    Up ...
 ```
 
@@ -231,10 +235,10 @@ cd /opt/stock-web
 docker compose exec app node -e "console.log({PASSWORD: Boolean(process.env.PASSWORD), SESSION_SECRET: Boolean(process.env.SESSION_SECRET)})"
 ```
 
-`.env`를 수정했다면 앱을 재생성한다.
+`.env`를 수정했다면 앱과 전략 워커를 재생성한다.
 
 ```bash
-docker compose up -d --force-recreate app
+docker compose up -d --force-recreate app strategy-worker
 docker compose ps
 ```
 
@@ -286,7 +290,7 @@ docker compose ps
 ```bash
 cd /opt/stock-web
 nano .env
-docker compose up -d --force-recreate app
+docker compose up -d --force-recreate app strategy-worker
 docker compose ps
 ```
 
@@ -303,4 +307,6 @@ docker compose up -d --force-recreate caddy
 - SSH 22 포트를 가능한 한 관리자 IP로 제한한다.
 - Lightsail 스냅샷과 암호화된 `.env` 백업을 별도로 유지한다.
 - 실투자 주문 차단 코드를 제거하지 않는다.
-- 앱 키 변경 후 `docker compose up -d --force-recreate app`으로 토큰 캐시를 갱신한다.
+- 전략 설정·주문 잠금·체결 상태는 `strategy_data` Docker 볼륨에 있으므로 배포 중 해당 볼륨을 삭제하지 않는다.
+- 앱 키 변경 후 `docker compose up -d --force-recreate app strategy-worker`로 토큰 캐시와 실시간 연결을 갱신한다.
+- 모의 자동주문을 켜기 전 `ENABLE_MOCK_STRATEGY_ORDERS=false` 상태로 최소 한 거래일 동안 신호 기록을 확인한다.

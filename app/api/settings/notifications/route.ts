@@ -5,12 +5,18 @@ import {
   parseNotificationPreferences,
   serializeNotificationPreferences,
 } from '@/lib/notification-preferences';
+import {
+  readStoredNotificationPreferences,
+  writeStoredNotificationPreferences,
+} from '@/lib/server/notification-preferences-store';
 
 export async function GET(request: NextRequest) {
+  const stored = await readStoredNotificationPreferences();
+  const legacy = request.cookies.get(notificationPreferencesCookie.name)?.value;
+  const preferences = legacy ? parseNotificationPreferences(legacy) : stored;
+  if (legacy) await writeStoredNotificationPreferences(preferences);
   return NextResponse.json({
-    preferences: parseNotificationPreferences(
-      request.cookies.get(notificationPreferencesCookie.name)?.value,
-    ),
+    preferences,
     configured: Boolean(
       process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID,
     ),
@@ -33,6 +39,8 @@ export async function PUT(request: NextRequest) {
       { status: 400 },
     );
   }
+
+  await writeStoredNotificationPreferences(body);
 
   const response = NextResponse.json({ preferences: body, success: true });
   response.cookies.set(

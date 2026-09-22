@@ -34,6 +34,7 @@ import {
   type StrategyMarket,
   type StrategySettings,
 } from '@/lib/strategy-settings';
+import { StrategyRuntimeBadge } from '@/components/strategy-server-sync';
 import type { KiwoomEnvironment } from '@/lib/kiwoom-environment';
 
 type Stock = ExcludedStock & {
@@ -219,6 +220,7 @@ export function DeadCrossSettings({
         <p className="mt-2 text-sm text-slate-500">
           단기 이동평균선의 장기 이동평균선 하향 돌파 조건을 구성합니다.
         </p>
+        <div className="mt-3"><StrategyRuntimeBadge /></div>
       </div>
 
       <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)] sm:p-5">
@@ -234,7 +236,8 @@ export function DeadCrossSettings({
         <p>
           완료된 봉의 종가로 단순 이동평균을 계산합니다. 단기 이동평균이 장기
           이동평균을 하향 돌파하면 매도 가능 수량 전량을 시장가로 매도합니다.
-          현재는 설정 인터페이스만 제공하며 자동매도는 실행되지 않습니다.
+          서버가 신호 기록 전용이면 주문하지 않으며, 모의 자동주문 활성
+          상태에서만 시장가 주문을 실행합니다.
         </p>
       </div>
 
@@ -250,7 +253,7 @@ export function DeadCrossSettings({
             </div>
             <SettingToggle
               label="데드크로스 기능"
-              description="향후 자동매도 엔진 연결 시 이 설정으로 기능을 활성화합니다."
+              description="서버 전략 워커에서 이 조건의 감시 여부를 설정합니다."
               checked={marketSettings.enabled}
               onChange={(enabled) =>
                 updateMarket((current) => ({ ...current, enabled }))

@@ -4,6 +4,8 @@ import { notificationPreferencesCookie, parseNotificationPreferences } from '@/l
 import { sendTelegramNotification } from '@/lib/telegram';
 import { createOrderStatusRequest, parseOrderStatus, type TrackedOrder } from '@/lib/kiwoom-order-status';
 import { startOrderMonitor } from '@/lib/order-monitor';
+import { submitCoordinatedSell } from '@/lib/server/sell-coordinator';
+import { strategyRuntimeStore } from '@/lib/server/strategy-runtime';
 
 type KiwoomResponse = Record<string, unknown> & { return_code?: number; token?: string; return_msg?: string };
 const tokenCache = new Map<Environment, { value: string; expiresAt: number }>();
@@ -88,32 +90,48 @@ export async function POST(request: NextRequest) {
   const existing = orders.get(idempotencyKey);
   if (existing && existing.expiresAt > Date.now()) return NextResponse.json(existing.response);
   try {
+    if (side === 'sell') {
+      const result = await submitCoordinatedSell({
+        environment: env,
+        market,
+        code,
+        source: 'manual',
+        reasons: ['manual-sell'],
+        requestedQuantity: quantity,
+        orderType: orderType as 'market' | 'limit',
+        price,
+        idempotencyKey,
+      });
+      if (result.status !== 'accepted')
+        return NextResponse.json(
+          { message: result.message, intentId: 'intentId' in result ? result.intentId : undefined },
+          { status: result.status === 'unavailable' ? 400 : 409 },
+        );
+      const response = {
+        success: true,
+        orderNo: result.orderNo,
+        message: '모의투자 매도 주문이 접수되었습니다.',
+      };
+      orders.set(idempotencyKey, { response, expiresAt: Date.now() + 10 * 60_000 });
+      return NextResponse.json(response);
+    }
+    if (strategyRuntimeStore().hasBlockingIntentForSymbol(env, market, code))
+      return NextResponse.json(
+        { message: '이 종목의 매도 처리가 진행 중이므로 추가 매수를 잠시 중지했습니다.' },
+        { status: 409 },
+      );
     const token = await getToken(env);
     let result: KiwoomResponse;
     if (isDomestic(env)) {
       if (market === 'NXT') return NextResponse.json({ message: '국내 모의투자는 NXT 주문을 지원하지 않습니다.' }, { status: 400 });
-      if (side === 'sell') {
-        const balance = await call(env, token, 'kt00018', '/api/dostk/acnt', { qry_tp: '2', dmst_stex_tp: 'KRX' });
-        const rows = Array.isArray(balance.acnt_evlt_remn_indv_tot) ? balance.acnt_evlt_remn_indv_tot as Record<string, unknown>[] : [];
-        const holding = rows.find((row) => text(row.stk_cd).replace(/^[AJQ]/, '') === code);
-        const availableQuantity = number(holding?.trde_able_qty);
-        if (quantity > availableQuantity) return NextResponse.json({ message: `주문 직전 매도 가능 수량은 ${availableQuantity}주입니다.`, availableQuantity }, { status: 409 });
-      }
-      result = await call(env, token, side === 'sell' ? 'kt10001' : 'kt10000', '/api/dostk/ordr', { dmst_stex_tp: 'KRX', stk_cd: code, ord_qty: String(quantity), ord_uv: orderType === 'limit' ? String(price) : '', trde_tp: orderType === 'limit' ? '0' : '3', cond_uv: '' });
+      result = await call(env, token, 'kt10000', '/api/dostk/ordr', { dmst_stex_tp: 'KRX', stk_cd: code, ord_qty: String(quantity), ord_uv: orderType === 'limit' ? String(price) : '', trde_tp: orderType === 'limit' ? '0' : '3', cond_uv: '' });
     } else {
       const stex_tp = marketCode(market);
       if (!stex_tp) return NextResponse.json({ message: '해외 모의투자가 지원하지 않는 거래소입니다.' }, { status: 400 });
-      if (side === 'sell') {
-        const balance = await call(env, token, 'ust21070', '/api/us/acnt', { stex_tp, stk_cd: code });
-        const rows = Array.isArray(balance.result_list) ? balance.result_list as Record<string, unknown>[] : [];
-        const holding = rows.find((row) => text(row.stk_cd) === code);
-        const availableQuantity = number(holding?.sell_alowq);
-        if (quantity > availableQuantity) return NextResponse.json({ message: `주문 직전 매도 가능 수량은 ${availableQuantity}주입니다.`, availableQuantity }, { status: 409 });
-      }
-      result = await call(env, token, side === 'sell' ? 'ust20001' : 'ust20000', '/api/us/ordr', { stex_tp, stk_cd: code, ord_qty: String(quantity), ord_uv: orderType === 'limit' ? String(price) : '', ...(side === 'sell' ? { stop_pric: '' } : {}), trde_tp: orderType === 'limit' ? '00' : '03' });
+      result = await call(env, token, 'ust20000', '/api/us/ordr', { stex_tp, stk_cd: code, ord_qty: String(quantity), ord_uv: orderType === 'limit' ? String(price) : '', trde_tp: orderType === 'limit' ? '00' : '03' });
     }
     const orderNo = text(result.ord_no);
-    const response = { success: true, orderNo, message: `모의투자 ${side === 'sell' ? '매도' : '매수'} 주문이 접수되었습니다.` };
+    const response = { success: true, orderNo, message: '모의투자 매수 주문이 접수되었습니다.' };
     orders.set(idempotencyKey, { response, expiresAt: Date.now() + 10 * 60_000 });
     if (orderNo) {
       const trackedOrder: TrackedOrder = { environment: env, side, code, market, orderNo, orderDate: kstDate() };

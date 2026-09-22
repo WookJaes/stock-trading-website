@@ -7,10 +7,13 @@
   },
   "scripts": {
     "dev": "vinext dev",
+    "dev:worker": "node --env-file-if-exists=.env --experimental-strip-types worker/strategy-worker.ts",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
-    "build": "vinext build",
+    "build": "vinext build && npm run build:worker",
+    "build:worker": "vite build --config vite.worker.config.ts",
     "start": "vinext start",
-    "lint": "oxlint app proxy.ts components/query-provider.tsx components/logout-button.tsx components/account-csv-download.tsx components/dead-cross-settings.tsx components/notification-settings.tsx components/order-quantity-controls.tsx components/recent-stock-searches.tsx components/rankings-view.tsx components/sl-tp-settings.tsx components/strategy-controls.tsx components/trailing-stop-settings.tsx components/stock-trade-panel.tsx components/watchlist.tsx components/ui/table.tsx lib tests",
+    "start:worker": "node --env-file-if-exists=.env dist/worker/strategy-worker.js",
+    "lint": "oxlint app proxy.ts components worker vite.worker.config.ts lib tests",
     "format": "oxfmt"
   },
   "dependencies": {

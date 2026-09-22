@@ -10,3 +10,4 @@ build/
 .vinext/
 .wrangler/
 *.tsbuildinfo
+.data/

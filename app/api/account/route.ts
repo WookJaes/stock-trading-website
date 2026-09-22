@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isDomestic, isKiwoomEnvironment, isLive, kiwoomCredentials, kiwoomDomain, type KiwoomEnvironment as Environment } from '@/lib/kiwoom-environment';
+import { fetchHoldings } from '@/lib/server/kiwoom-portfolio';
 
 type KiwoomResponse = Record<string, unknown> & { return_code?: number };
 const tokenCache = new Map<Environment, { value: string; expiresAt: number }>();
@@ -38,9 +39,10 @@ async function domesticAccount(environment: Environment, token: string) {
   return { environment, asOf: new Date().toISOString(), currency: 'KRW' as const, accountNotice: rows.length === 0 && parseNumber(data.prsm_dpst_aset_amt) === 0 && parseNumber(deposit.entr) === 0 ? `키움 ${isLive(environment) ? '실투자' : '모의투자'} API가 현재 계좌의 조회 내역이 없다고 응답했습니다.` : undefined, cashBalance: parseNumber(deposit.entr), totalPurchaseAmount: parseNumber(data.tot_pur_amt), totalEvaluationAmount: parseNumber(data.tot_evlt_amt), totalProfitLoss: parseNumber(data.tot_evlt_pl), totalProfitRate: parseNumber(data.tot_prft_rt), estimatedAssets: parseNumber(data.prsm_dpst_aset_amt), holdings: rows.map((row) => ({ code: parseText(row.stk_cd).replace(/^[AJQ]/, ''), name: parseText(row.stk_nm), market: 'KRX', quantity: parseNumber(row.rmnd_qty), availableQuantity: parseNumber(row.trde_able_qty), averagePrice: parseNumber(row.pur_pric), currentPrice: Math.abs(parseNumber(row.cur_prc)), evaluationAmount: parseNumber(row.evlt_amt), profitLoss: parseNumber(row.evltv_prft), profitRate: parseNumber(row.prft_rt), currency: 'KRW' as const })) };
 }
 async function overseasAccount(environment: Environment, token: string) {
-  const [valuation, deposit] = await Promise.all([
+  const [valuation, deposit, holdings] = await Promise.all([
     requestKiwoom(environment, token, 'ust21120', '/api/us/acnt', { cmsn_incl_tp: '0', exrt_tp: '0' }),
     requestKiwoom(environment, token, 'ust21160', '/api/us/acnt', {}),
+    fetchHoldings(environment),
   ]);
   const currencyRows = Array.isArray(valuation.result_list) ? valuation.result_list as Record<string, unknown>[] : [];
   const usd = currencyRows.find((row) => parseText(row.crnc_code) === 'USD');
@@ -52,12 +54,17 @@ async function overseasAccount(environment: Environment, token: string) {
     cashBalance: parseNumber(usd?.fx_entr ?? deposit.d0_usd_fx_entr),
     cashBalanceKrw: parseNumber(valuation.won_entr ?? deposit.won_entr),
     withdrawableKrw: parseNumber(deposit.d0_won_conv_alow_ch),
-    totalPurchaseAmount: 0,
-    totalEvaluationAmount: parseNumber(usd?.evlt_amt),
-    totalProfitLoss: 0,
-    totalProfitRate: 0,
+    totalPurchaseAmount: holdings.reduce((sum, holding) => sum + holding.averagePrice * holding.quantity, 0),
+    totalEvaluationAmount: holdings.reduce((sum, holding) => sum + holding.currentPrice * holding.quantity, 0) || parseNumber(usd?.evlt_amt),
+    totalProfitLoss: holdings.reduce((sum, holding) => sum + (holding.currentPrice - holding.averagePrice) * holding.quantity, 0),
+    totalProfitRate: holdings.reduce((sum, holding) => sum + holding.averagePrice * holding.quantity, 0) > 0 ? holdings.reduce((sum, holding) => sum + (holding.currentPrice - holding.averagePrice) * holding.quantity, 0) / holdings.reduce((sum, holding) => sum + holding.averagePrice * holding.quantity, 0) * 100 : 0,
     estimatedAssets: parseNumber(valuation.aset_evlt_amt),
-    holdings: [],
+    holdings: holdings.map((holding) => ({
+      ...holding,
+      evaluationAmount: holding.currentPrice * holding.quantity,
+      profitLoss: (holding.currentPrice - holding.averagePrice) * holding.quantity,
+      profitRate: holding.averagePrice > 0 ? (holding.currentPrice - holding.averagePrice) / holding.averagePrice * 100 : 0,
+    })),
   };
 }
 
