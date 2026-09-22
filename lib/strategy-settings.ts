@@ -25,11 +25,35 @@ export type TrailingStopMarketSettings = {
   excludedStocks: ExcludedStock[];
 };
 
+export type ChartCandleId =
+  | 'minute:1'
+  | 'minute:3'
+  | 'minute:5'
+  | 'minute:10'
+  | 'minute:15'
+  | 'minute:30'
+  | 'minute:45'
+  | 'minute:60'
+  | 'day'
+  | 'week'
+  | 'month';
+
+export type DeadCrossMarketSettings = {
+  enabled: boolean;
+  startTime: string;
+  endTime: string;
+  candle: ChartCandleId;
+  shortPeriod: number;
+  longPeriod: number;
+  excludedStocks: ExcludedStock[];
+};
+
 export type StrategySettings = {
   version: 1;
   strategies: {
     slTp: Record<StrategyMarket, SlTpMarketSettings>;
     trailingStop: Record<StrategyMarket, TrailingStopMarketSettings>;
+    deadCross: Record<StrategyMarket, DeadCrossMarketSettings>;
     [key: string]: unknown;
   };
 };
@@ -51,6 +75,31 @@ export const marketSessions = {
     close: '16:00',
   },
 } as const;
+
+export const chartCandleOptions: Record<
+  StrategyMarket,
+  ReadonlyArray<{ value: ChartCandleId; label: string; apiId: string }>
+> = {
+  domestic: [
+    { value: 'minute:1', label: '1분봉', apiId: 'ka10080' },
+    { value: 'minute:3', label: '3분봉', apiId: 'ka10080' },
+    { value: 'minute:5', label: '5분봉', apiId: 'ka10080' },
+    { value: 'minute:10', label: '10분봉', apiId: 'ka10080' },
+    { value: 'minute:15', label: '15분봉', apiId: 'ka10080' },
+    { value: 'minute:30', label: '30분봉', apiId: 'ka10080' },
+    { value: 'minute:45', label: '45분봉', apiId: 'ka10080' },
+    { value: 'minute:60', label: '60분봉', apiId: 'ka10080' },
+    { value: 'day', label: '일봉', apiId: 'ka10081' },
+    { value: 'week', label: '주봉', apiId: 'ka10082' },
+    { value: 'month', label: '월봉', apiId: 'ka10083' },
+  ],
+  overseas: [
+    { value: 'minute:1', label: '1분봉', apiId: 'usa06011' },
+    { value: 'day', label: '일봉', apiId: 'usa06012' },
+    { value: 'week', label: '주봉', apiId: 'usa06013' },
+    { value: 'month', label: '월봉', apiId: 'usa06014' },
+  ],
+};
 
 export const defaultStrategySettings: StrategySettings = {
   version: 1,
@@ -91,6 +140,26 @@ export const defaultStrategySettings: StrategySettings = {
         excludedStocks: [],
       },
     },
+    deadCross: {
+      domestic: {
+        enabled: false,
+        startTime: marketSessions.domestic.open,
+        endTime: marketSessions.domestic.close,
+        candle: 'minute:5',
+        shortPeriod: 5,
+        longPeriod: 20,
+        excludedStocks: [],
+      },
+      overseas: {
+        enabled: false,
+        startTime: marketSessions.overseas.open,
+        endTime: marketSessions.overseas.close,
+        candle: 'minute:1',
+        shortPeriod: 5,
+        longPeriod: 20,
+        excludedStocks: [],
+      },
+    },
   },
 };
 
@@ -118,6 +187,29 @@ export function validateMarketTimeRange(
     minutes(startTime) >= minutes(session.open) &&
     minutes(endTime) <= minutes(session.close) &&
     minutes(startTime) < minutes(endTime)
+  );
+}
+
+export function isSupportedChartCandle(
+  market: StrategyMarket,
+  value: unknown,
+): value is ChartCandleId {
+  return (
+    typeof value === 'string' &&
+    chartCandleOptions[market].some((option) => option.value === value)
+  );
+}
+
+export function validateMovingAveragePeriods(
+  shortPeriod: number,
+  longPeriod: number,
+) {
+  return (
+    Number.isSafeInteger(shortPeriod) &&
+    Number.isSafeInteger(longPeriod) &&
+    shortPeriod >= 1 &&
+    longPeriod >= 2 &&
+    shortPeriod < longPeriod
   );
 }
 
@@ -208,6 +300,35 @@ function parseTrailingStopMarketSettings(
   };
 }
 
+function parseDeadCrossMarketSettings(
+  market: StrategyMarket,
+  value: unknown,
+): DeadCrossMarketSettings | null {
+  if (!isRecord(value)) return null;
+  const excludedStocks = parseExcludedStocks(value.excludedStocks);
+  if (
+    typeof value.enabled !== 'boolean' ||
+    !isTime(value.startTime) ||
+    !isTime(value.endTime) ||
+    !isSupportedChartCandle(market, value.candle) ||
+    typeof value.shortPeriod !== 'number' ||
+    typeof value.longPeriod !== 'number' ||
+    !validateMovingAveragePeriods(value.shortPeriod, value.longPeriod) ||
+    !excludedStocks ||
+    !validateMarketTimeRange(market, value.startTime, value.endTime)
+  )
+    return null;
+  return {
+    enabled: value.enabled,
+    startTime: value.startTime,
+    endTime: value.endTime,
+    candle: value.candle,
+    shortPeriod: value.shortPeriod,
+    longPeriod: value.longPeriod,
+    excludedStocks,
+  };
+}
+
 export function parseStrategySettings(text: string): StrategySettings | null {
   try {
     const value = JSON.parse(text) as unknown;
@@ -230,6 +351,18 @@ export function parseStrategySettings(text: string): StrategySettings | null {
         : null
       : defaultStrategySettings.strategies.trailingStop.overseas;
     if (!trailingDomestic || !trailingOverseas) return null;
+    const deadCross = value.strategies.deadCross;
+    const deadCrossDomestic = deadCross
+      ? isRecord(deadCross)
+        ? parseDeadCrossMarketSettings('domestic', deadCross.domestic)
+        : null
+      : defaultStrategySettings.strategies.deadCross.domestic;
+    const deadCrossOverseas = deadCross
+      ? isRecord(deadCross)
+        ? parseDeadCrossMarketSettings('overseas', deadCross.overseas)
+        : null
+      : defaultStrategySettings.strategies.deadCross.overseas;
+    if (!deadCrossDomestic || !deadCrossOverseas) return null;
     return {
       version: 1,
       strategies: {
@@ -238,6 +371,10 @@ export function parseStrategySettings(text: string): StrategySettings | null {
         trailingStop: {
           domestic: trailingDomestic,
           overseas: trailingOverseas,
+        },
+        deadCross: {
+          domestic: deadCrossDomestic,
+          overseas: deadCrossOverseas,
         },
       },
     };
