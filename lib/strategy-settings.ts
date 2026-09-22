@@ -16,10 +16,20 @@ export type SlTpMarketSettings = {
   excludedStocks: ExcludedStock[];
 };
 
+export type TrailingStopMarketSettings = {
+  enabled: boolean;
+  startTime: string;
+  endTime: string;
+  activationProfitPercent: number;
+  drawdownPercent: number;
+  excludedStocks: ExcludedStock[];
+};
+
 export type StrategySettings = {
   version: 1;
   strategies: {
     slTp: Record<StrategyMarket, SlTpMarketSettings>;
+    trailingStop: Record<StrategyMarket, TrailingStopMarketSettings>;
     [key: string]: unknown;
   };
 };
@@ -60,6 +70,24 @@ export const defaultStrategySettings: StrategySettings = {
         endTime: marketSessions.overseas.close,
         takeProfitPercent: 5,
         stopLossPercent: 3,
+        excludedStocks: [],
+      },
+    },
+    trailingStop: {
+      domestic: {
+        enabled: false,
+        startTime: marketSessions.domestic.open,
+        endTime: marketSessions.domestic.close,
+        activationProfitPercent: 5,
+        drawdownPercent: 2,
+        excludedStocks: [],
+      },
+      overseas: {
+        enabled: false,
+        startTime: marketSessions.overseas.open,
+        endTime: marketSessions.overseas.close,
+        activationProfitPercent: 5,
+        drawdownPercent: 2,
         excludedStocks: [],
       },
     },
@@ -150,6 +178,36 @@ function parseMarketSettings(
   };
 }
 
+function parseTrailingStopMarketSettings(
+  market: StrategyMarket,
+  value: unknown,
+): TrailingStopMarketSettings | null {
+  if (!isRecord(value)) return null;
+  const excludedStocks = parseExcludedStocks(value.excludedStocks);
+  if (
+    typeof value.enabled !== 'boolean' ||
+    !isTime(value.startTime) ||
+    !isTime(value.endTime) ||
+    typeof value.activationProfitPercent !== 'number' ||
+    !Number.isFinite(value.activationProfitPercent) ||
+    value.activationProfitPercent <= 0 ||
+    typeof value.drawdownPercent !== 'number' ||
+    !Number.isFinite(value.drawdownPercent) ||
+    value.drawdownPercent <= 0 ||
+    !excludedStocks ||
+    !validateMarketTimeRange(market, value.startTime, value.endTime)
+  )
+    return null;
+  return {
+    enabled: value.enabled,
+    startTime: value.startTime,
+    endTime: value.endTime,
+    activationProfitPercent: value.activationProfitPercent,
+    drawdownPercent: value.drawdownPercent,
+    excludedStocks,
+  };
+}
+
 export function parseStrategySettings(text: string): StrategySettings | null {
   try {
     const value = JSON.parse(text) as unknown;
@@ -160,11 +218,27 @@ export function parseStrategySettings(text: string): StrategySettings | null {
     const domestic = parseMarketSettings('domestic', slTp.domestic);
     const overseas = parseMarketSettings('overseas', slTp.overseas);
     if (!domestic || !overseas) return null;
+    const trailingStop = value.strategies.trailingStop;
+    const trailingDomestic = trailingStop
+      ? isRecord(trailingStop)
+        ? parseTrailingStopMarketSettings('domestic', trailingStop.domestic)
+        : null
+      : defaultStrategySettings.strategies.trailingStop.domestic;
+    const trailingOverseas = trailingStop
+      ? isRecord(trailingStop)
+        ? parseTrailingStopMarketSettings('overseas', trailingStop.overseas)
+        : null
+      : defaultStrategySettings.strategies.trailingStop.overseas;
+    if (!trailingDomestic || !trailingOverseas) return null;
     return {
       version: 1,
       strategies: {
         ...value.strategies,
         slTp: { domestic, overseas },
+        trailingStop: {
+          domestic: trailingDomestic,
+          overseas: trailingOverseas,
+        },
       },
     };
   } catch {

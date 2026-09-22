@@ -28,9 +28,21 @@ await test('전체 전략 설정을 JSON 텍스트로 내보내고 다시 가져
     name: '삼성전자',
     market: 'KOSPI',
   });
+  settings.strategies.trailingStop.overseas.enabled = true;
+  settings.strategies.trailingStop.overseas.activationProfitPercent = 7.5;
   assert.deepEqual(
     parseStrategySettings(serializeStrategySettings(settings)),
     settings,
+  );
+});
+
+await test('기존 SL / TP 설정에는 트레일링 스탑 기본값을 추가한다', () => {
+  const previousSettings = structuredClone(defaultStrategySettings);
+  Reflect.deleteProperty(previousSettings.strategies, 'trailingStop');
+  const parsed = parseStrategySettings(JSON.stringify(previousSettings));
+  assert.deepEqual(
+    parsed?.strategies.trailingStop,
+    defaultStrategySettings.strategies.trailingStop,
   );
 });
 
@@ -46,6 +58,24 @@ await test('유효하지 않은 전략 설정 JSON은 거부한다', () => {
             domestic: {
               ...defaultStrategySettings.strategies.slTp.domestic,
               startTime: '08:30',
+            },
+          },
+        },
+      }),
+    ),
+    null,
+  );
+  assert.equal(
+    parseStrategySettings(
+      JSON.stringify({
+        ...defaultStrategySettings,
+        strategies: {
+          ...defaultStrategySettings.strategies,
+          trailingStop: {
+            ...defaultStrategySettings.strategies.trailingStop,
+            overseas: {
+              ...defaultStrategySettings.strategies.trailingStop.overseas,
+              drawdownPercent: 0,
             },
           },
         },
